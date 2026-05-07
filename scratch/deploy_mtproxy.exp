@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "cd /root/bot-logistic && git fetch --all && git reset --hard origin/main\r"
+expect "#"
+send "pm2 restart bot-logistic\r"
+expect "#"
+send "exit\r"
+expect eof

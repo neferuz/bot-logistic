@@ -1,0 +1,26 @@
+#!/usr/bin/expect -f
+set timeout 120
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "cd /root/bot-logistic\r"
+expect "#"
+send "pm2 delete bot-logistic || true\r"
+expect "#"
+send "pkill -f main.py || true\r"
+expect "#"
+send "git fetch --all && git reset --hard origin/main\r"
+expect "#"
+send "rm -rf venv\r"
+expect "#"
+send "python3 -m venv venv\r"
+expect "#"
+send "./venv/bin/pip install -r requirements.txt\r"
+expect "#"
+send "pm2 start main.py --name bot-logistic --interpreter ./venv/bin/python3\r"
+expect "#"
+send "pm2 save\r"
+expect "#"
+send "exit\r"
+expect eof

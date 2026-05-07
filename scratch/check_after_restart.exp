@@ -1,0 +1,10 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "sleep 20 && pm2 logs bot-logistic --lines 30 --nostream\r"
+expect "#"
+send "exit\r"
+expect eof

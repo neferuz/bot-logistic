@@ -332,30 +332,62 @@ class AdminBot:
             clean_phone = "".join(filter(str.isdigit, phone))
             await state.update_data(phone=phone)
             
-            status_msg = await message.reply("⏳ Подключаюсь к Telegram... Подождите.")
+            status_msg = await message.reply("⏳ Подключаюсь к Telegram... Это может занять до 30 секунд из-за блокировок. Подождите.")
             print(f"[ADD_ACCOUNT] Попытка подключения для {clean_phone}...")
             
             try:
+                from telethon import connection
                 client = TelegramClient(
                     f"sessions/session_{clean_phone}", 
                     self.userbot_mgr.api_id, 
                     self.userbot_mgr.api_hash,
-                    connection_retries=5,
-                    retry_delay=2,
-                    timeout=30,
-                    request_retries=3
+                    connection=connection.TcpAbridged,
+                    use_ipv6=False,
+                    device_model="iPhone 15 Pro",
+                    system_version="17.4.1",
+                    app_version="10.11.0"
                 )
-                await client.connect()
-                print(f"[ADD_ACCOUNT] Подключение успешно для {clean_phone}")
                 
-                sent = await client.send_code_request(phone)
-                self.temp_clients[phone] = client
-                await state.update_data(phone_code_hash=sent.phone_code_hash)
-                await status_msg.edit_text("📩 Код отправлен. Введите его:")
-                await state.set_state(AuthStates.waiting_code)
+                print(f"[ADD_ACCOUNT] Попытка прямого подключения к DC для {clean_phone}...")
+                
+                # Принудительный таймаут на 30 секунд
+                try:
+                    await asyncio.wait_for(client.connect(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    print(f"[ADD_ACCOUNT] ТАЙМАУТ при подключении для {clean_phone}")
+                    await status_msg.edit_text("❌ Ошибка: Превышено время ожидания. Попробуйте ещё раз.")
+                    await state.clear()
+                    return
+
+                if not client.is_connected():
+                    await status_msg.edit_text("❌ Не удалось установить соединение.")
+                    await state.clear()
+                    return
+                
+                print(f"[ADD_ACCOUNT] Подключение успешно для {clean_phone}. Отправка кода...")
+                
+                try:
+                    sent = await client.send_code_request(phone)
+                    self.temp_clients[phone] = client
+                    await state.update_data(phone_code_hash=sent.phone_code_hash)
+                    
+                    from telethon import types as tl_types
+                    method = "в приложение Telegram"
+                    if isinstance(sent.type, tl_types.SentCodeTypeSms):
+                        method = "по СМС"
+                    elif isinstance(sent.type, tl_types.SentCodeTypeCall):
+                        method = "через звонок"
+                        
+                    await status_msg.edit_text(f"📩 Код отправлен {method}! Введите его:")
+                    await state.set_state(AuthStates.waiting_code)
+                except Exception as e_send:
+                    print(f"[ADD_ACCOUNT] ОШИБКА отправки кода для {clean_phone}: {e_send}")
+                    await status_msg.edit_text(f"❌ Подключились, но не смогли отправить код: {e_send}")
+                    await client.disconnect()
+                    await state.clear()
             except Exception as e:
-                print(f"[ADD_ACCOUNT] ОШИБКА для {clean_phone}: {type(e).__name__}: {e}")
-                await status_msg.edit_text(f"❌ Ошибка подключения: {type(e).__name__}: {e}\n\n💡 Попробуйте ещё раз через /add_account")
+                print(f"[ADD_ACCOUNT] ОШИБКА подключения для {clean_phone}: {type(e).__name__}: {e}")
+                await status_msg.edit_text(f"❌ Ошибка подключения: {type(e).__name__}: {e}\n\n💡 Сервер Telegram временно недоступен. Попробуйте через минуту.")
                 await state.clear()
 
         @self.dp.message(AuthStates.waiting_code)
@@ -363,19 +395,31 @@ class AdminBot:
             if message.text and message.text.startswith("/"): return
             data = await state.get_data()
             phone = data['phone']
-            code = message.text.strip()
+            code = message.text.strip().replace(" ", "")
             client = self.temp_clients.get(phone)
-            if not client: return await message.reply("Ошибка сессии. Введите /add_account заново.")
+            
+            if not client: 
+                return await message.reply("❌ Ошибка сессии. Введите /add_account заново.")
 
+            print(f"[ADD_ACCOUNT] Ввод кода для {phone}: {code}")
             try:
+                # Освежаем соединение перед вводом кода, чтобы не было таймаута
+                if not client.is_connected():
+                    await client.connect()
+                
                 await client.sign_in(phone, code, phone_code_hash=data['phone_code_hash'])
+                
                 # Сохраняем в БД с привязкой к владельцу
+                clean_phone = "".join(filter(str.isdigit, phone))
                 async with aiosqlite.connect(self.db.db_path) as db:
                     await db.execute("INSERT OR REPLACE INTO accounts (phone, session_name, owner_id) VALUES (?, ?, ?)",
-                                     (phone, f"session_{phone}", message.from_user.id))
+                                     (clean_phone, f"session_{clean_phone}", message.from_user.id))
                     await db.commit()
                 
-                self.userbot_mgr.clients.append(client)
+                if client not in self.userbot_mgr.clients:
+                    self.userbot_mgr.clients.append(client)
+                
+                print(f"[ADD_ACCOUNT] Успешный вход: {phone}")
                 
                 # Если вошли успешно - выбор папки
                 builder = InlineKeyboardBuilder()
@@ -389,10 +433,12 @@ class AdminBot:
                 await state.update_data(target_client_for_join=client)
                 await state.set_state(AuthStates.waiting_folder_selection)
             except SessionPasswordNeededError:
-                await message.reply("🔐 Введите облачный пароль (2FA):")
+                print(f"[ADD_ACCOUNT] Требуется 2FA для {phone}")
+                await message.reply("🔐 Аккаунт защищён облачным паролем. Введите его (2FA):")
                 await state.set_state(AuthStates.waiting_password)
             except Exception as e:
-                await message.reply(f"❌ Ошибка: {e}")
+                print(f"[ADD_ACCOUNT] ОШИБКА при вводе кода для {phone}: {type(e).__name__}: {e}")
+                await message.reply(f"❌ Ошибка: {e}\n\n💡 Возможно, код устарел. Попробуйте ещё раз /add_account")
                 await state.clear()
 
         @self.dp.message(AuthStates.waiting_password)

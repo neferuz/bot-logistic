@@ -1,0 +1,22 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "ls -la /root/bot-logistic/sessions/\r"
+expect "#"
+send "rm -f /root/bot-logistic/sessions/*-journal\r"
+expect "#"
+send "rm -f /root/bot-logistic/sessions/session_71793.session /root/bot-logistic/sessions/session_991718539.session /root/bot-logistic/sessions/session_998991718539.session\r"
+expect "#"
+send "ls -la /root/bot-logistic/sessions/\r"
+expect "#"
+send "pm2 restart bot-logistic && pm2 flush bot-logistic\r"
+expect "#"
+send "sleep 10\r"
+expect "#"
+send "pm2 logs bot-logistic --lines 30 --nostream\r"
+expect "#"
+send "exit\r"
+expect eof

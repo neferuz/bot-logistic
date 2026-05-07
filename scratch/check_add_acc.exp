@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "grep -i 'ADD_ACCOUNT\\|998935\\|attempt\\|connect\\|TimeoutError' /root/.pm2/logs/bot-logistic-error.log | tail -30\r"
+expect "#"
+send "grep -i 'ADD_ACCOUNT\\|998935' /root/.pm2/logs/bot-logistic-out.log | tail -10\r"
+expect "#"
+send "exit\r"
+expect eof

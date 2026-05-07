@@ -16,48 +16,54 @@ class UserbotManager:
         if not os.path.exists(session_dir):
             os.makedirs(session_dir)
 
+        # Запускаем инициализацию каждой сессии в отдельной задаче, чтобы не блокировать основной поток
         for session_file in os.listdir(session_dir):
             if session_file.endswith(".session"):
-                session_name = session_file.replace(".session", "")
-                phone = session_name.replace("session_", "")
-                
-                client = TelegramClient(
-                    os.path.join(session_dir, session_name), 
-                    self.api_id, self.api_hash,
-                    connection_retries=5,
-                    retry_delay=2,
-                    timeout=30,
-                    request_retries=3
-                )
-                try:
-                    await client.connect()
-                except Exception as e:
-                    print(f"⚠️ Не удалось подключить сессию {session_name}: {type(e).__name__}: {e}")
-                    continue
-                if await client.is_user_authorized():
-                    self.clients.append(client)
-                    self.active_sessions.append(session_name)
-                    
-                    # Синхронизация с БД
-                    me = await client.get_me()
-                    username = f"{me.first_name or ''} {me.last_name or ''}".strip() or me.username or "Unknown"
-                    
-                    async with self.db._connect() as db:
-                        # Проверяем, есть ли уже такой аккаунт
-                        async with db.execute("SELECT id FROM accounts WHERE phone = ?", (phone,)) as cursor:
-                            if not await cursor.fetchone():
-                                # Если нет, добавляем его владельцу-админу по умолчанию (первый в списке ADMIN_IDS)
-                                admins = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
-                                owner_id = admins[0] if admins else 0
-                                await db.execute(
-                                    "INSERT INTO accounts (phone, session_name, username, owner_id) VALUES (?, ?, ?, ?)",
-                                    (phone, session_name, username, owner_id)
-                                )
-                                await db.commit()
-                else:
-                    print(f"Skipping unauthorized session: {session_file}")
+                asyncio.create_task(self._init_single_session(session_dir, session_file))
+
+    async def _init_single_session(self, session_dir, session_file):
+        session_name = session_file.replace(".session", "")
+        phone = session_name.replace("session_", "")
         
-        print(f"Initialized {len(self.clients)} userbot sessions and synced with DB.")
+        client = TelegramClient(
+            os.path.join(session_dir, session_name), 
+            self.api_id, self.api_hash,
+            connection_retries=3,
+            retry_delay=2,
+            timeout=15
+        )
+        
+        try:
+            print(f"[INIT] Подключение сессии {session_name}...")
+            await asyncio.wait_for(client.connect(), timeout=20)
+            
+            if await client.is_user_authorized():
+                self.clients.append(client)
+                self.active_sessions.append(session_name)
+                print(f"✅ Сессия {session_name} авторизована.")
+                
+                # Синхронизация с БД
+                me = await client.get_me()
+                username = f"{me.first_name or ''} {me.last_name or ''}".strip() or me.username or "Unknown"
+                
+                async with self.db._connect() as db:
+                    # Проверяем, есть ли уже такой аккаунт
+                    async with db.execute("SELECT id FROM accounts WHERE phone = ?", (phone,)) as cursor:
+                        if not await cursor.fetchone():
+                            admins = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
+                            owner_id = admins[0] if admins else 670031187
+                            await db.execute(
+                                "INSERT INTO accounts (phone, session_name, username, owner_id) VALUES (?, ?, ?, ?)",
+                                (phone, session_name, username, owner_id)
+                            )
+                            await db.commit()
+            else:
+                print(f"⚠️ Сессия {session_file} не авторизована, пропускаем.")
+                await client.disconnect()
+        except Exception as e:
+            print(f"❌ Ошибка подключения сессии {session_name}: {e}")
+            try: await client.disconnect() 
+            except: pass
 
     async def broadcast(self, message: str, owner_id: int = None, mode: str = 'mine', delay_range=(30, 60), report_callback=None):
         target_clients = []

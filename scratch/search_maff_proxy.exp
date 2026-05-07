@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "ls -la /root/maff-ai/ /root/maff-bot/\r"
+expect "#"
+send "cat /root/maff-ai/.env | grep -i 'PROXY'\r"
+expect "#"
+send "cat /root/maff-bot/.env | grep -i 'PROXY'\r"
+expect "#"
+send "exit\r"
+expect eof

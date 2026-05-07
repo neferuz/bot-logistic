@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "find /root/maff-ai/ -name '*.py' | xargs grep -l 'TelegramClient'\r"
+expect "#"
+send "cat /root/maff-ai/utils/userbot.py | head -50\r" # Или где там у них юзербот
+expect "#"
+send "exit\r"
+expect eof

@@ -1,0 +1,17 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "cd /root/bot-logistic && git pull origin main\r"
+expect "#"
+# Удаляем только те сессии, которые не полностью авторизованы (маленького размера)
+send "find sessions/ -name '*.session' -size -10k -delete\r"
+expect "#"
+send "pm2 restart bot-logistic\r"
+expect "#"
+send "sleep 5 && pm2 logs bot-logistic --lines 20 --nostream\r"
+expect "#"
+send "exit\r"
+expect eof
