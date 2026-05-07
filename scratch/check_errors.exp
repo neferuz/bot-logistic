@@ -1,0 +1,16 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "cat /root/.pm2/logs/bot-logistic-out.log | tail -50\r"
+expect "#"
+send "cat /root/.pm2/logs/bot-logistic-error.log | tail -80\r"
+expect "#"
+send "ls -la /root/bot-logistic/sessions/\r"
+expect "#"
+send "pm2 show bot-logistic | head -20\r"
+expect "#"
+send "exit\r"
+expect eof

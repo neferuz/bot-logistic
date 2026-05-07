@@ -21,8 +21,19 @@ class UserbotManager:
                 session_name = session_file.replace(".session", "")
                 phone = session_name.replace("session_", "")
                 
-                client = TelegramClient(os.path.join(session_dir, session_name), self.api_id, self.api_hash)
-                await client.connect()
+                client = TelegramClient(
+                    os.path.join(session_dir, session_name), 
+                    self.api_id, self.api_hash,
+                    connection_retries=5,
+                    retry_delay=2,
+                    timeout=30,
+                    request_retries=3
+                )
+                try:
+                    await client.connect()
+                except Exception as e:
+                    print(f"⚠️ Не удалось подключить сессию {session_name}: {type(e).__name__}: {e}")
+                    continue
                 if await client.is_user_authorized():
                     self.clients.append(client)
                     self.active_sessions.append(session_name)
@@ -48,7 +59,7 @@ class UserbotManager:
         
         print(f"Initialized {len(self.clients)} userbot sessions and synced with DB.")
 
-    async def broadcast(self, message: str, owner_id: int = None, mode: str = 'mine', delay_range=(30, 60)):
+    async def broadcast(self, message: str, owner_id: int = None, mode: str = 'mine', delay_range=(30, 60), report_callback=None):
         target_clients = []
         
         async with self.db._connect() as db:
@@ -90,13 +101,37 @@ class UserbotManager:
 
         if not target_clients:
             print(f"Нет активных аккаунтов для вещания (mode={mode}, owner={owner_id})")
+            if report_callback:
+                await report_callback("📊 **Статистика рассылки:**\n\n❌ Нет активных аккаунтов для рассылки.")
             return
 
-        # Для каждого аккаунта запускаем рассылку
-        tasks = [self._broadcast_for_client(c, message, delay_range) for c in target_clients]
+        # Для каждого аккаунта запускаем рассылку и собираем статистику
+        stats = {}
+        tasks = [self._broadcast_for_client(c, message, delay_range, stats) for c in target_clients]
         await asyncio.gather(*tasks)
+        
+        # Формируем отчёт
+        if report_callback and stats:
+            report = "📊 **СТАТИСТИКА РАССЫЛКИ**\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n"
+            total_sent = 0
+            total_failed = 0
+            for phone, data in stats.items():
+                sent = data.get('sent', 0)
+                failed = data.get('failed', 0)
+                total = data.get('total', 0)
+                total_sent += sent
+                total_failed += failed
+                status = "✅" if failed == 0 else "⚠️"
+                report += f"{status} **+{phone}**\n"
+                report += f"   └ 📤 Отправлено: {sent}/{total} | ❌ Ошибок: {failed}\n\n"
+            
+            report += f"⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
+            report += f"📱 Аккаунтов: **{len(stats)}**\n"
+            report += f"📤 Всего отправлено: **{total_sent}**\n"
+            report += f"❌ Всего ошибок: **{total_failed}**"
+            await report_callback(report)
 
-    async def _broadcast_for_client(self, client, message, delay_range):
+    async def _broadcast_for_client(self, client, message, delay_range, stats=None):
         from telethon import functions, types
         try:
             me = await client.get_me()
@@ -130,10 +165,13 @@ class UserbotManager:
 
             if not target_peers:
                 print(f"[{phone}] К сожалению, не найдено ни одной группы для рассылки.")
+                if stats is not None:
+                    stats[phone] = {'sent': 0, 'failed': 0, 'total': 0}
                 return
 
             # Выполняем рассылку
             sent_count = 0
+            failed_count = 0
             for peer in target_peers:
                 try:
                     await client.send_message(peer, message)
@@ -141,12 +179,16 @@ class UserbotManager:
                     print(f"[{phone}] ✅ Отправлено в {getattr(peer, 'channel_id', getattr(peer, 'chat_id', 'unknown'))} ({sent_count}/{len(target_peers)})")
                     await asyncio.sleep(random.randint(*delay_range))
                 except Exception as e:
+                    failed_count += 1
                     print(f"[{phone}] ❌ Ошибка отправки: {e}")
                     if "flood" in str(e).lower():
                         print(f"[{phone}] ⚠️ Flood Wait! Пропускаю аккаунт.")
                         break
             
-            print(f"--- [BROADCAST] Finished for {phone}. Успешно: {sent_count} ---")
+            if stats is not None:
+                stats[phone] = {'sent': sent_count, 'failed': failed_count, 'total': len(target_peers)}
+            
+            print(f"--- [BROADCAST] Finished for {phone}. Успешно: {sent_count}, Ошибок: {failed_count} ---")
             
         except Exception as e:
             print(f"--- [BROADCAST] Global error for client: {e} ---")

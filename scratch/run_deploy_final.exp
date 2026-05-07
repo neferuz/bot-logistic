@@ -1,0 +1,22 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "git clone https://github.com/neferuz/bot-logistic /root/bot-logistic || (cd /root/bot-logistic && git pull)\r"
+expect "#"
+send "cd /root/bot-logistic\r"
+expect "#"
+send "python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt\r"
+expect "#"
+send "mkdir -p data\r"
+expect "#"
+send "pm2 delete bot-logistic || true\r"
+expect "#"
+send "pm2 start main.py --name bot-logistic --interpreter python3\r"
+expect "#"
+send "pm2 save\r"
+expect "#"
+send "exit\r"
+expect eof

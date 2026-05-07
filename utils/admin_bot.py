@@ -331,16 +331,31 @@ class AdminBot:
             # Нормализуем номер для имени файла (только цифры)
             clean_phone = "".join(filter(str.isdigit, phone))
             await state.update_data(phone=phone)
-            client = TelegramClient(f"sessions/session_{clean_phone}", self.userbot_mgr.api_id, self.userbot_mgr.api_hash)
-            await client.connect()
+            
+            status_msg = await message.reply("⏳ Подключаюсь к Telegram... Подождите.")
+            print(f"[ADD_ACCOUNT] Попытка подключения для {clean_phone}...")
+            
             try:
+                client = TelegramClient(
+                    f"sessions/session_{clean_phone}", 
+                    self.userbot_mgr.api_id, 
+                    self.userbot_mgr.api_hash,
+                    connection_retries=5,
+                    retry_delay=2,
+                    timeout=30,
+                    request_retries=3
+                )
+                await client.connect()
+                print(f"[ADD_ACCOUNT] Подключение успешно для {clean_phone}")
+                
                 sent = await client.send_code_request(phone)
                 self.temp_clients[phone] = client
                 await state.update_data(phone_code_hash=sent.phone_code_hash)
-                await message.reply("📩 Код отправлен. Введите его:")
+                await status_msg.edit_text("📩 Код отправлен. Введите его:")
                 await state.set_state(AuthStates.waiting_code)
             except Exception as e:
-                await message.reply(f"❌ Ошибка: {e}")
+                print(f"[ADD_ACCOUNT] ОШИБКА для {clean_phone}: {type(e).__name__}: {e}")
+                await status_msg.edit_text(f"❌ Ошибка подключения: {type(e).__name__}: {e}\n\n💡 Попробуйте ещё раз через /add_account")
                 await state.clear()
 
         @self.dp.message(AuthStates.waiting_code)
@@ -699,8 +714,15 @@ class AdminBot:
         async def cb_br_once(cb: types.CallbackQuery, state: FSMContext):
             data = await state.get_data()
             mode = data.get('broadcast_mode', 'mine')
+            chat_id = cb.message.chat.id
             await cb.message.edit_text(f"🚀 Запуск рассылки (режим: {mode})...")
-            asyncio.create_task(self.userbot_mgr.broadcast(self.last_broadcast_text, owner_id=cb.from_user.id, mode=mode))
+            
+            async def send_report(text):
+                try:
+                    await self.bot.send_message(chat_id, text, parse_mode="Markdown")
+                except: pass
+            
+            asyncio.create_task(self.userbot_mgr.broadcast(self.last_broadcast_text, owner_id=cb.from_user.id, mode=mode, report_callback=send_report))
             await cb.answer()
 
         @self.dp.callback_query(F.data.startswith('grp_fld_'))
@@ -723,8 +745,14 @@ class AdminBot:
         async def cb_br_sch(cb: types.CallbackQuery, state: FSMContext):
             h = int(cb.data.split('_')[2])
             u_id = cb.from_user.id
+            chat_id = cb.message.chat.id
             data = await state.get_data()
             mode = data.get('broadcast_mode', 'mine')
+            
+            async def send_report(text):
+                try:
+                    await self.bot.send_message(chat_id, text, parse_mode="Markdown")
+                except: pass
             
             j_id = f"br_{u_id}_{h}_{int(asyncio.get_event_loop().time())}"
             self.scheduler.add_job(
@@ -732,10 +760,11 @@ class AdminBot:
                 'interval', 
                 hours=h, 
                 args=[self.last_broadcast_text, u_id, mode], 
+                kwargs={'report_callback': send_report},
                 id=j_id
             )
             await cb.message.edit_text(f"🕒 Рассылка (режим: {mode}) запланирована раз в {h} ч.")
-            asyncio.create_task(self.userbot_mgr.broadcast(self.last_broadcast_text, owner_id=u_id, mode=mode))
+            asyncio.create_task(self.userbot_mgr.broadcast(self.last_broadcast_text, owner_id=u_id, mode=mode, report_callback=send_report))
             await cb.answer()
 
         @self.dp.callback_query(F.data.startswith('br_mode_'))

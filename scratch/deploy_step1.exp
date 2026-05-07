@@ -1,0 +1,18 @@
+#!/usr/bin/expect -f
+set timeout 60
+set password "e+6XDV^uLDJSQj"
+set host "83.217.221.84"
+set user "root"
+
+spawn ssh -o StrictHostKeyChecking=no $user@$host
+expect "password:"
+send "$password\r"
+expect "#"
+send "rm -rf /root/bot-logistic\r"
+expect "#"
+send "git clone https://github.com/neferuz/bot-logistic /root/bot-logistic\r"
+expect "#"
+send "ls -la /root/bot-logistic\r"
+expect "#"
+send "exit\r"
+expect eof
