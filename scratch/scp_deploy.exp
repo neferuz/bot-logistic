@@ -1,0 +1,23 @@
+#!/usr/bin/expect -f
+set timeout 60
+# Копируем admin_bot.py
+spawn scp -o StrictHostKeyChecking=no /Users/apple/Desktop/bot-logistic-main/utils/admin_bot.py root@83.217.221.84:/root/bot-logistic/utils/admin_bot.py
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect eof
+
+# Копируем userbot_manager.py
+spawn scp -o StrictHostKeyChecking=no /Users/apple/Desktop/bot-logistic-main/utils/userbot_manager.py root@83.217.221.84:/root/bot-logistic/utils/userbot_manager.py
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect eof
+
+# Перезапускаем бота
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "pm2 restart bot-logistic\r"
+expect "#"
+send "exit\r"
+expect eof

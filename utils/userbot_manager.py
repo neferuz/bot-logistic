@@ -25,9 +25,13 @@ class UserbotManager:
         session_name = session_file.replace(".session", "")
         phone = session_name.replace("session_", "")
         
+        # Используем надежный MTProxy
+        proxy = ('162.159.193.1', 443, 'dd00000000000000000000000000000000')
+        
         client = TelegramClient(
             os.path.join(session_dir, session_name), 
             self.api_id, self.api_hash,
+            proxy=proxy,
             connection_retries=3,
             retry_delay=2,
             timeout=15

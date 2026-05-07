@@ -1,0 +1,19 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "cd /root/bot-logistic\r"
+expect "#"
+# Убиваем всё живое
+send "pm2 stop all && pkill -9 python3 && pkill -9 python\r"
+expect "#"
+# Проверяем, что в файле реально написано ConnectionTcpAbridged
+send "grep 'ConnectionTcpAbridged' utils/admin_bot.py\r"
+expect "#"
+# Запускаем заново
+send "pm2 restart bot-logistic || pm2 start main.py --name bot-logistic --interpreter ./venv/bin/python3\r"
+expect "#"
+send "exit\r"
+expect eof

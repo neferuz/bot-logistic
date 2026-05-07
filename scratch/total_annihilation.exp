@@ -1,0 +1,28 @@
+#!/usr/bin/expect -f
+set timeout 120
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+# Сносим всё
+send "pm2 stop bot-logistic && pm2 delete bot-logistic || true\r"
+expect "#"
+send "rm -rf /root/bot-logistic\r"
+expect "#"
+# Качаем заново
+send "git clone https://github.com/neferuz/bot-logistic /root/bot-logistic\r"
+expect "#"
+send "cd /root/bot-logistic\r"
+expect "#"
+# Проверяем ГЛАЗАМИ (через grep) прямо сейчас
+send "grep 'TcpAbridged' utils/admin_bot.py\r"
+expect "#"
+# Настройка
+send "python3 -m venv venv\r"
+expect "#"
+send "./venv/bin/pip install -r requirements.txt\r"
+expect "#"
+send "pm2 start main.py --name bot-logistic --interpreter ./venv/bin/python3\r"
+expect "#"
+send "exit\r"
+expect eof

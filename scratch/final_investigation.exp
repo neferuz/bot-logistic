@@ -1,0 +1,17 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+# 1. Проверяем токен в .env
+send "cat /root/bot-logistic/.env | grep 'BOT_TOKEN'\r"
+expect "#"
+# 2. Ищем все запущенные main.py
+send "ps aux | grep main.py\r"
+expect "#"
+# 3. ЧИТАЕМ файл utils/admin_bot.py прямо сейчас на экран (первые 400 строк)
+send "cat /root/bot-logistic/utils/admin_bot.py | grep -C 5 'TelegramClient'\r"
+expect "#"
+send "exit\r"
+expect eof

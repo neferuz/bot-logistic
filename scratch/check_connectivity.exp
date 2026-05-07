@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "ping6 -c 3 google.com\r"
+expect "#"
+send "ping -c 3 149.154.167.51\r"
+expect "#"
+send "exit\r"
+expect eof

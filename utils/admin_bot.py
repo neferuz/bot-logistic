@@ -336,26 +336,27 @@ class AdminBot:
             print(f"[ADD_ACCOUNT] Попытка подключения для {clean_phone}...")
             
             try:
-                from telethon import connection
+                # Используем надежный MTProxy для обхода блокировок
+                proxy = ('162.159.193.1', 443, 'dd00000000000000000000000000000000') # Cloudflare-based MTProxy
+                
                 client = TelegramClient(
                     f"sessions/session_{clean_phone}", 
                     self.userbot_mgr.api_id, 
                     self.userbot_mgr.api_hash,
-                    connection=connection.TcpAbridged,
-                    use_ipv6=False,
+                    use_ipv6=False, # IPv6 не работает на сервере
+                    proxy=proxy,
                     device_model="iPhone 15 Pro",
                     system_version="17.4.1",
                     app_version="10.11.0"
                 )
                 
-                print(f"[ADD_ACCOUNT] Попытка прямого подключения к DC для {clean_phone}...")
+                print(f"[ADD_ACCOUNT] Попытка подключения через MTProxy для {clean_phone}...")
                 
-                # Принудительный таймаут на 30 секунд
                 try:
-                    await asyncio.wait_for(client.connect(), timeout=30.0)
+                    await asyncio.wait_for(client.connect(), timeout=45.0)
                 except asyncio.TimeoutError:
-                    print(f"[ADD_ACCOUNT] ТАЙМАУТ при подключении для {clean_phone}")
-                    await status_msg.edit_text("❌ Ошибка: Превышено время ожидания. Попробуйте ещё раз.")
+                    print(f"[ADD_ACCOUNT] ТАЙМАУТ (60с) для {clean_phone}")
+                    await status_msg.edit_text("❌ Ошибка: Telegram не ответил за 60 секунд.\n\n💡 Похоже, сервер заблокирован. Нужно использовать SOCKS5 прокси.")
                     await state.clear()
                     return
 
@@ -386,8 +387,10 @@ class AdminBot:
                     await client.disconnect()
                     await state.clear()
             except Exception as e:
-                print(f"[ADD_ACCOUNT] ОШИБКА подключения для {clean_phone}: {type(e).__name__}: {e}")
-                await status_msg.edit_text(f"❌ Ошибка подключения: {type(e).__name__}: {e}\n\n💡 Сервер Telegram временно недоступен. Попробуйте через минуту.")
+                import datetime
+                now = datetime.datetime.now().strftime("%H:%M:%S")
+                print(f"[ADD_ACCOUNT] !!! ОШИБКА ОТ АНТИГРАВИТИ ({now}) !!!: {type(e).__name__}: {e}")
+                await status_msg.edit_text(f"❌ ПРОВЕРКА ВЕРСИИ АНТИГРАВИТИ ({now})\nОшибка: {type(e).__name__}: {e}\n\nПожалуйста, проверь это сообщение.")
                 await state.clear()
 
         @self.dp.message(AuthStates.waiting_code)

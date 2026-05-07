@@ -1,0 +1,25 @@
+#!/usr/bin/expect -f
+set timeout 60
+# 1. Копируем файлы ПРЯМО на сервер, минуя Гитхаб
+spawn scp -o StrictHostKeyChecking=no /Users/apple/Desktop/bot-logistic-main/utils/admin_bot.py root@83.217.221.84:/root/bot-logistic/utils/admin_bot.py
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect eof
+
+spawn scp -o StrictHostKeyChecking=no /Users/apple/Desktop/bot-logistic-main/utils/userbot_manager.py root@83.217.221.84:/root/bot-logistic/utils/userbot_manager.py
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect eof
+
+# 2. Перезапускаем бота
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+send "pm2 restart bot-logistic\r"
+expect "#"
+# 3. Проверяем ГЛАЗАМИ прямо на сервере, что слова TcpAbridged БОЛЬШЕ НЕТ
+send "grep 'TcpAbridged' /root/bot-logistic/utils/admin_bot.py\r"
+expect "#"
+send "exit\r"
+expect eof

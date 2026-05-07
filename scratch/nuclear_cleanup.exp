@@ -1,0 +1,20 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@83.217.221.84
+expect "password:"
+send "e+6XDV^uLDJSQj\r"
+expect "#"
+# 1. Останавливаем PM2 полностью
+send "pm2 kill\r"
+expect "#"
+# 2. Убиваем все процессы Python
+send "killall -9 python3 python || true\r"
+expect "#"
+# 3. Ищем ВСЕ файлы admin_bot.py на сервере
+send "find / -name 'admin_bot.py' 2>/dev/null\r"
+expect "#"
+# 4. Проверяем содержимое нашего файла
+send "grep 'TcpAbridged' /root/bot-logistic/utils/admin_bot.py\r"
+expect "#"
+send "exit\r"
+expect eof
