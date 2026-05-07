@@ -1,8 +1,7 @@
-.env
-bot.db
-cargo_bot.db
-database.db
-*.db
+# .env and db files included per user request
+# .env
+# *.db
+
 sessions/
 __pycache__/
 *.pyc
