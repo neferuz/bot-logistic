@@ -1,0 +1,11 @@
+.env
+bot.db
+cargo_bot.db
+database.db
+*.db
+sessions/
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/

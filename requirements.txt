@@ -1,0 +1,6 @@
+telethon
+aiogram
+python-dotenv
+aiosqlite
+apscheduler
+pydantic
