@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+set timeout 30
+set password "e+6XDV^uLDJSQj"
+set host "83.217.221.84"
+set user "root"
+
+spawn ssh -o StrictHostKeyChecking=no $user@$host
+expect "password:"
+send "$password\r"
+expect "#"
+send "cat /root/maff-ai/backend/bot.py\r"
+expect "#"
+send "exit\r"
+expect eof

@@ -1,5 +1,7 @@
 from __future__ import annotations
 from aiogram import Bot, Dispatcher, types, F
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
 from typing import Union
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -33,7 +35,11 @@ SUPER_ADMIN_IDS = [1033031442, 8588637245, 670031187]
 
 class AdminBot:
     def __init__(self, bot_token: str, db: Database, userbot_mgr: UserbotManager):
-        self.bot = Bot(token=bot_token)
+        # Setup proxy via Cloudflare Worker
+        session = AiohttpSession(
+            api=TelegramAPIServer.from_base("https://falling-king-6328.notferuz.workers.dev")
+        )
+        self.bot = Bot(token=bot_token, session=session)
         self.dp = Dispatcher(storage=MemoryStorage())
         self.db = db
         self.userbot_mgr = userbot_mgr
